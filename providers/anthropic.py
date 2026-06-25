@@ -3,7 +3,7 @@ import anthropic
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-def send_message(prompt, model="claude-haiku-4-5-20251001"):
+def send_message(prompt, model="claude-3-5-haiku-20241022"):
     message = client.messages.create(
         model=model,
         max_tokens=1024,

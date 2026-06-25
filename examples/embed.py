@@ -1,12 +1,18 @@
 import os
 import sys
+import math
 import yaml
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-sys.path.insert(0, ".")
 
-with open("llm.yaml") as f:
+ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT))
+
+from providers.utils import openai_client
+
+with open(ROOT / "llm.yaml") as f:
     config = yaml.safe_load(f)
 
 provider = config["provider"]
@@ -27,40 +33,36 @@ def embed_local(texts):
     import requests
     embeddings = []
     for text in texts:
-        res = requests.post("http://localhost:11434/api/embeddings", json={
-            "model": config["model"],
-            "prompt": text
-        })
-        embeddings.append(res.json()["embedding"])
+        try:
+            res = requests.post("http://localhost:11434/api/embed", json={
+                "model": config["model"],
+                "input": text
+            }, timeout=60)
+            embeddings.append(res.json()["embeddings"][0])
+        except requests.exceptions.ConnectionError:
+            raise RuntimeError("Ollama is not running. Start it with: ollama serve")
     return embeddings
 
-def embed_openai(texts, model="text-embedding-3-small"):
-    from openai import OpenAI
-    base_urls = {
-        "groq":     "https://api.groq.com/openai/v1",
-        "together": "https://api.together.xyz/v1",
-    }
-    api_keys = {
-        "openai":   os.getenv("OPENAI_API_KEY"),
-        "together": os.getenv("TOGETHER_API_KEY"),
-    }
-    kwargs = {"api_key": api_keys.get(provider, "")}
-    if provider in base_urls:
-        kwargs["base_url"] = base_urls[provider]
-    client = OpenAI(**kwargs)
+def embed_api(texts):
+    client = openai_client(provider)
+    model = "text-embedding-3-small" if provider == "openai" else config["model"]
     res = client.embeddings.create(input=texts, model=model)
     return [item.embedding for item in res.data]
 
-embeddings = embed_local(texts) if provider == "local" else embed_openai(texts)
+if provider not in ("local", "openai"):
+    print(f"Embeddings are only supported for 'local' and 'openai' providers. Got: {provider}")
+    sys.exit(1)
 
-print(f"\nGenerated {len(embeddings)} embeddings")
-print(f"Dimensions: {len(embeddings[0])}")
+embeddings = embed_local(texts) if provider == "local" else embed_api(texts)
+
+print(f"\nGenerated {len(embeddings)} embeddings, {len(embeddings[0])} dimensions each")
 
 if len(embeddings) == 2:
-    import math
     a, b = embeddings
     dot = sum(x * y for x, y in zip(a, b))
     mag_a = math.sqrt(sum(x**2 for x in a))
     mag_b = math.sqrt(sum(x**2 for x in b))
-    similarity = dot / (mag_a * mag_b)
-    print(f"Cosine similarity between text 1 and 2: {similarity:.4f}")
+    if mag_a == 0 or mag_b == 0:
+        print("Cosine similarity: undefined (zero vector)")
+    else:
+        print(f"Cosine similarity: {dot / (mag_a * mag_b):.4f}")

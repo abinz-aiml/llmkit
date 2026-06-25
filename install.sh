@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [ ! -f llm.yaml ]; then
+    echo "llm.yaml not found. Copying from llm.yaml.example..."
+    cp llm.yaml.example llm.yaml 2>/dev/null || { echo "Error: llm.yaml missing. Create it from the README."; exit 1; }
+fi
+
 provider=$(grep 'provider:' llm.yaml | awk '{print $2}')
 model=$(grep 'model:' llm.yaml | awk '{print $2}')
 ram_gb=$(free -g | awk '/^Mem:/{print $2}')
@@ -18,10 +23,10 @@ if [ "$provider" = "local" ]; then
     fi
     echo "Pulling $model..."
     ollama pull "$model"
-    pip3 install -r requirements.txt -q
+    pip3 install -r requirements.txt -q 2>/dev/null || pip3 install -r requirements.txt -q --break-system-packages
     echo "Done. Run: python3 examples/chat.py"
 else
-    pip3 install -r requirements.txt -q
+    pip3 install -r requirements.txt -q 2>/dev/null || pip3 install -r requirements.txt -q --break-system-packages
     if [ ! -f .env ]; then
         cp .env.example .env
         echo "Add your API key to .env then run: python3 examples/chat.py"

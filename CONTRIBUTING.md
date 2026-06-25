@@ -23,7 +23,7 @@ def send_message(prompt, model="default-model-name"):
 
 2. Add `YOURPROVIDER_API_KEY=` to `.env.example`
 
-3. Add your provider to the if/elif block in `examples/chat.py`, `examples/stream.py`, `examples/rag.py`
+3. Add your provider to the `providers` dict in `examples/chat.py`, the `providers_map` dict in `examples/rag.py`, and the `providers_map` dict in `cli.py`
 
 4. Add a row to the API providers table in `README.md`
 

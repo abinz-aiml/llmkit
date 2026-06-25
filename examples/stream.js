@@ -1,9 +1,10 @@
 const fs = require("fs");
+const path = require("path");
 const readline = require("readline");
 const yaml = require("js-yaml");
-require("dotenv").config();
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
-const config = yaml.load(fs.readFileSync("llm.yaml", "utf8"));
+const config = yaml.load(fs.readFileSync(path.join(__dirname, "..", "llm.yaml"), "utf8"));
 
 const API_ENDPOINTS = {
     openai:   "https://api.openai.com/v1/chat/completions",
@@ -21,12 +22,18 @@ const API_KEYS = {
     together: process.env.TOGETHER_API_KEY,
 };
 
+if (config.provider === "anthropic") {
+    console.error("Anthropic is not supported in JS. Use: python examples/stream.py");
+    process.exit(1);
+}
+
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 console.log(`llmkit | ${config.provider} / ${config.model} | streaming`);
 
 rl.question("You: ", async (prompt) => {
     process.stdout.write("AI: ");
+    try {
 
     if (config.provider === "local") {
         const res = await fetch("http://localhost:11434/api/generate", {
@@ -75,5 +82,8 @@ rl.question("You: ", async (prompt) => {
     }
 
     console.log("\n");
+    } catch (err) {
+        console.error(`\nError: ${err.message}`);
+    }
     rl.close();
 });

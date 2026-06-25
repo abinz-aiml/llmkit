@@ -30,8 +30,13 @@ For API providers, copy `.env.example` to `.env` and add your key.
 ## Run
 
 ```bash
+# Windows
 python examples/chat.py
-# or
+
+# Mac / Linux
+python3 examples/chat.py
+
+# JavaScript (any OS, requires Node)
 node examples/chat.js
 ```
 
@@ -51,7 +56,7 @@ node examples/chat.js
 | Provider | Env key | Fast cheap model |
 |---|---|---|
 | OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-haiku-4-5-20251001` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-3-5-haiku-20241022` |
 | Groq | `GROQ_API_KEY` | `llama-3.1-8b-instant` |
 | Together | `TOGETHER_API_KEY` | `meta-llama/Llama-3.3-70B-Instruct-Turbo` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |

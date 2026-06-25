@@ -2,21 +2,33 @@ import os
 import sys
 import json
 import yaml
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-sys.path.insert(0, ".")
 
-with open("llm.yaml") as f:
+ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT))
+
+from providers.utils import openai_client
+
+with open(ROOT / "llm.yaml") as f:
     config = yaml.safe_load(f)
 
 provider = config["provider"]
 model = config["model"]
 
+if provider == "local":
+    print("Function calling requires an API provider. Switch provider in llm.yaml.")
+    sys.exit(0)
+
 def get_weather(city):
     return f"Sunny, 72F in {city}."
 
 def calculate(expression):
+    allowed = set("0123456789+-*/(). ")
+    if not all(c in allowed for c in expression):
+        return "Error: invalid characters in expression"
     try:
         return str(eval(expression))
     except Exception as e:
@@ -24,7 +36,7 @@ def calculate(expression):
 
 tool_map = {"get_weather": get_weather, "calculate": calculate}
 
-tools_openai = [
+tools_schema = [
     {
         "type": "function",
         "function": {
@@ -56,50 +68,48 @@ prompt = input("You: ").strip()
 if provider == "anthropic":
     import anthropic
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    tools_anthropic = [
+    anthropic_tools = [
         {"name": t["function"]["name"], "description": t["function"]["description"], "input_schema": t["function"]["parameters"]}
-        for t in tools_openai
+        for t in tools_schema
     ]
+    messages = [{"role": "user", "content": prompt}]
     response = client.messages.create(
         model=model, max_tokens=1024,
-        tools=tools_anthropic,
-        messages=[{"role": "user", "content": prompt}]
+        tools=anthropic_tools,
+        messages=messages
     )
+
+    tool_results = []
     for block in response.content:
         if block.type == "tool_use":
+            if block.name not in tool_map:
+                print(f"Unknown tool: {block.name}")
+                continue
             result = tool_map[block.name](**block.input)
             print(f"Tool: {block.name}({block.input}) → {result}")
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": result
+            })
         elif block.type == "text" and block.text:
             print(f"AI: {block.text}")
 
-elif provider == "local":
-    print("Note: function calling requires an API provider. Switch provider in llm.yaml.")
-    sys.exit(0)
+    if tool_results:
+        messages += [
+            {"role": "assistant", "content": response.content},
+            {"role": "user", "content": tool_results}
+        ]
+        final = client.messages.create(model=model, max_tokens=1024, tools=anthropic_tools, messages=messages)
+        if final.content and final.content[0].type == "text":
+            print(f"AI: {final.content[0].text}")
 
 else:
-    from openai import OpenAI
-    base_urls = {
-        "groq":     "https://api.groq.com/openai/v1",
-        "deepseek": "https://api.deepseek.com/v1",
-        "together": "https://api.together.xyz/v1",
-        "mistral":  "https://api.mistral.ai/v1",
-    }
-    api_keys = {
-        "openai":   os.getenv("OPENAI_API_KEY"),
-        "groq":     os.getenv("GROQ_API_KEY"),
-        "deepseek": os.getenv("DEEPSEEK_API_KEY"),
-        "together": os.getenv("TOGETHER_API_KEY"),
-        "mistral":  os.getenv("MISTRAL_API_KEY"),
-    }
-    kwargs = {"api_key": api_keys[provider]}
-    if provider in base_urls:
-        kwargs["base_url"] = base_urls[provider]
-
-    client = OpenAI(**kwargs)
+    client = openai_client(provider)
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        tools=tools_openai
+        tools=tools_schema
     )
     message = response.choices[0].message
 
@@ -107,14 +117,18 @@ else:
         tool_results = []
         for call in message.tool_calls:
             args = json.loads(call.function.arguments)
+            if call.function.name not in tool_map:
+                print(f"Unknown tool: {call.function.name}")
+                continue
             result = tool_map[call.function.name](**args)
             print(f"Tool: {call.function.name}({args}) → {result}")
             tool_results.append({"role": "tool", "tool_call_id": call.id, "content": result})
 
-        final = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}, message, *tool_results]
-        )
-        print(f"AI: {final.choices[0].message.content}")
+        if tool_results:
+            final = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}, message, *tool_results]
+            )
+            print(f"AI: {final.choices[0].message.content}")
     else:
         print(f"AI: {message.content}")

@@ -1,44 +1,45 @@
 import os
 import sys
+import importlib
 import yaml
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-sys.path.insert(0, ".")
 
-API_KEYS = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY", "TOGETHER_API_KEY", "DEEPSEEK_API_KEY", "MISTRAL_API_KEY"]
+ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT))
+
+from providers.utils import API_KEY_NAMES
 
 def check_env_hint(provider):
     if provider == "local":
-        found = [k for k in API_KEYS if os.getenv(k)]
+        found = [k for k in API_KEY_NAMES.values() if os.getenv(k)]
         if found:
             print(f"Hint: found {found[0]} in .env — set provider in llm.yaml to use it\n")
 
 def load_provider():
-    with open("llm.yaml") as f:
+    with open(ROOT / "llm.yaml") as f:
         config = yaml.safe_load(f)
 
     provider = config["provider"]
     model = config["model"]
 
-    if provider == "local":
-        from providers.local import send_message
-    elif provider == "openai":
-        from providers.openai import send_message
-    elif provider == "anthropic":
-        from providers.anthropic import send_message
-    elif provider == "groq":
-        from providers.groq import send_message
-    elif provider == "together":
-        from providers.together import send_message
-    elif provider == "deepseek":
-        from providers.deepseek import send_message
-    elif provider == "mistral":
-        from providers.mistral import send_message
-    else:
+    providers = {
+        "local":     "providers.local",
+        "openai":    "providers.openai",
+        "anthropic": "providers.anthropic",
+        "groq":      "providers.groq",
+        "together":  "providers.together",
+        "deepseek":  "providers.deepseek",
+        "mistral":   "providers.mistral",
+    }
+
+    if provider not in providers:
         raise ValueError(f"Unknown provider: {provider}")
 
-    return send_message, model, provider
+    mod = importlib.import_module(providers[provider])
+    return mod.send_message, model, provider
 
 send_message, model, provider = load_provider()
 check_env_hint(provider)
@@ -56,3 +57,5 @@ while True:
     except KeyboardInterrupt:
         print("\nBye!")
         break
+    except Exception as e:
+        print(f"Error: {e}\n")

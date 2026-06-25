@@ -1,9 +1,10 @@
 const fs = require("fs");
+const path = require("path");
 const readline = require("readline");
 const yaml = require("js-yaml");
-require("dotenv").config();
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
-const config = yaml.load(fs.readFileSync("llm.yaml", "utf8"));
+const config = yaml.load(fs.readFileSync(path.join(__dirname, "..", "llm.yaml"), "utf8"));
 
 const API_ENDPOINTS = {
     openai:   "https://api.openai.com/v1/chat/completions",
@@ -48,16 +49,25 @@ async function sendMessage(prompt) {
     return data.choices[0].message.content;
 }
 
+if (config.provider === "anthropic") {
+    console.error("Anthropic is not supported in JS. Use: python examples/chat.py");
+    process.exit(1);
+}
+
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-console.log(`llmctl | ${config.provider} / ${config.model}`);
+console.log(`llmkit | ${config.provider} / ${config.model}`);
 console.log("Ctrl+C to exit\n");
 
 function ask() {
     rl.question("You: ", async (input) => {
         if (!input.trim()) return ask();
-        const response = await sendMessage(input.trim());
-        console.log(`AI: ${response}\n`);
+        try {
+            const response = await sendMessage(input.trim());
+            console.log(`AI: ${response}\n`);
+        } catch (err) {
+            console.error(`Error: ${err.message}\n`);
+        }
         ask();
     });
 }
