@@ -67,3 +67,21 @@ Open `http://localhost:3000`
 ## Add a provider
 
 Drop a file in `providers/` that exports `send_message(prompt, model)`. That's it.
+
+Example — adding a new provider called `myprovider.py`:
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("MYPROVIDER_API_KEY"), base_url="https://api.myprovider.com/v1")
+
+def send_message(prompt, model="my-model"):
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+```
+
+Then set `provider: myprovider` in `llm.yaml` and add `MYPROVIDER_API_KEY` to `.env`.
