@@ -3,8 +3,13 @@ set -e
 
 provider=$(grep 'provider:' llm.yaml | awk '{print $2}')
 model=$(grep 'model:' llm.yaml | awk '{print $2}')
+ram_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
 
-echo "Provider: $provider | Model: $model"
+echo "Provider: $provider | Model: $model | RAM: ${ram_gb}GB"
+
+if [ "$ram_gb" -lt 8 ]; then
+    echo "Warning: less than 8GB RAM. Stick to small models like phi4 or llama3.2."
+fi
 
 if ! command -v brew &>/dev/null; then
     echo "Installing Homebrew..."
@@ -20,10 +25,10 @@ if [ "$provider" = "local" ]; then
     sleep 2
     echo "Pulling $model..."
     ollama pull "$model"
-    echo ""
+    pip3 install -r requirements.txt -q
     echo "Done. Run: python3 examples/chat.py"
 else
-    pip3 install openai anthropic groq together mistralai python-dotenv pyyaml -q
+    pip3 install -r requirements.txt -q
     if [ ! -f .env ]; then
         cp .env.example .env
         echo "Add your API key to .env then run: python3 examples/chat.py"

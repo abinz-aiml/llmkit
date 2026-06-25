@@ -1,0 +1,13 @@
+llmkit is a developer toolkit for running any LLM locally or via API.
+
+It supports local models through Ollama, including Llama, Qwen, Mistral, Phi, Gemma, and DeepSeek.
+
+For API providers, llmkit works with OpenAI, Anthropic, Groq, Together AI, DeepSeek, and Mistral.
+
+To switch between providers, edit the llm.yaml file and change the provider and model fields.
+
+The examples folder contains chat, streaming, RAG, and function calling examples that work with any provider.
+
+RAG stands for Retrieval Augmented Generation. It lets the LLM answer questions based on your own documents.
+
+To use RAG, drop .txt files into the docs folder and run examples/rag.py.
