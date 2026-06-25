@@ -1,0 +1,9 @@
+{
+  "name": "llmkit",
+  "version": "1.0.0",
+  "description": "Run any LLM — local or via API — with one config file",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "js-yaml": "^4.1.0"
+  }
+}
