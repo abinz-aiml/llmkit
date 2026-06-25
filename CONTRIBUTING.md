@@ -29,6 +29,20 @@ def send_message(prompt, model="default-model-name"):
 
 5. Open a pull request
 
+## Add an MCP server
+
+Any MCP-compatible server works out of the box — just add it to `mcp_servers` in `llm.yaml`:
+
+```yaml
+mcp_servers:
+  - name: myserver
+    command: npx -y @myorg/mcp-server-myserver
+    env:
+      MY_API_KEY: ${MY_API_KEY}
+```
+
+No code changes needed. See `examples/mcp_agent.py` and the MCP section in `README.md`.
+
 ## Add an example
 
 Drop a `.py` or `.js` file in `examples/`. It should read `llm.yaml` and work with at least local and one API provider.

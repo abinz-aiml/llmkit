@@ -41,7 +41,10 @@ if provider == "local":
             "model": model, "prompt": question,
             "images": [image_data], "stream": False
         }, timeout=120)
-        print(f"\nAI: {res.json()['response']}")
+        data = res.json()
+        if "error" in data:
+            raise RuntimeError(f"Ollama error: {data['error']}")
+        print(f"\nAI: {data['response']}")
     except requests.exceptions.ConnectionError:
         print("Error: Ollama is not running. Start it with: ollama serve")
     except Exception as e:
@@ -67,6 +70,7 @@ else:
         client = openai_client(provider)
         res = client.chat.completions.create(
             model=model,
+            max_tokens=1024,
             messages=[{"role": "user", "content": [
                 {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{image_data}"}},
                 {"type": "text", "text": question}

@@ -1,9 +1,8 @@
 import os
 from mistralai import Mistral
 
-client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
-
 def send_message(prompt, model="mistral-small-latest"):
+    client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
     response = client.chat.complete(
         model=model,
         messages=[{"role": "user", "content": prompt}]

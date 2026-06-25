@@ -23,7 +23,7 @@ if provider == "local":
     print("Agent requires function calling. Use openai/groq/anthropic/deepseek in llm.yaml.")
     sys.exit(0)
 
-# --- Tools the agent can use ---
+WORKSPACE = Path.cwd().resolve()
 
 def read_file(path):
     try:
@@ -33,8 +33,6 @@ def read_file(path):
         return p.read_text(encoding="utf-8")
     except Exception as e:
         return f"Error: {e}"
-
-WORKSPACE = Path.cwd().resolve()
 
 def write_file(path, content):
     try:
@@ -79,67 +77,32 @@ def list_dir(path="."):
         return f"Error: {e}"
 
 tool_map = {
-    "read_file": lambda args: read_file(**args),
+    "read_file":  lambda args: read_file(**args),
     "write_file": lambda args: write_file(**args),
-    "run_shell": lambda args: run_shell(**args),
-    "list_dir": lambda args: list_dir(**args),
+    "run_shell":  lambda args: run_shell(**args),
+    "list_dir":   lambda args: list_dir(**args),
 }
 
 tools_schema = [
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read contents of a file",
-            "parameters": {
-                "type": "object",
-                "properties": {"path": {"type": "string", "description": "File path"}},
-                "required": ["path"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "write_file",
-            "description": "Create or overwrite a file with given content",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "File path"},
-                    "content": {"type": "string", "description": "File content"}
-                },
-                "required": ["path", "content"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "run_shell",
-            "description": "Run a shell command and return output",
-            "parameters": {
-                "type": "object",
-                "properties": {"command": {"type": "string", "description": "Shell command"}},
-                "required": ["command"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_dir",
-            "description": "List files and folders in a directory",
-            "parameters": {
-                "type": "object",
-                "properties": {"path": {"type": "string", "description": "Directory path, default ."}},
-                "required": []
-            }
-        }
-    }
+    {"type": "function", "function": {
+        "name": "read_file", "description": "Read contents of a file",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
+    }},
+    {"type": "function", "function": {
+        "name": "write_file", "description": "Create or overwrite a file with given content",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string"}, "content": {"type": "string"}
+        }, "required": ["path", "content"]}
+    }},
+    {"type": "function", "function": {
+        "name": "run_shell", "description": "Run a shell command and return output",
+        "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}
+    }},
+    {"type": "function", "function": {
+        "name": "list_dir", "description": "List files and folders in a directory",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": []}
+    }},
 ]
-
-# --- Agent loop ---
 
 def run_agent_openai(task):
     client = openai_client(provider)
@@ -147,88 +110,66 @@ def run_agent_openai(task):
         {"role": "system", "content": "You are a coding agent. Complete tasks by using tools. When done, summarize what you did."},
         {"role": "user", "content": task}
     ]
-
-    for step in range(10):
-        response = client.chat.completions.create(
-            model=model, messages=messages, tools=tools_schema
-        )
+    for _ in range(10):
+        response = client.chat.completions.create(model=model, messages=messages, tools=tools_schema)
         message = response.choices[0].message
         messages.append(message)
-
         if not message.tool_calls:
             if message.content:
                 print(f"\nAgent: {message.content}")
             return
-
         for call in message.tool_calls:
-            args = json.loads(call.function.arguments)
+            try:
+                args = json.loads(call.function.arguments)
+                if call.function.name not in tool_map:
+                    result = f"Error: unknown tool '{call.function.name}'"
+                else:
+                    result = tool_map[call.function.name](args)
+            except Exception as e:
+                args, result = {}, f"Error: {e}"
             print(f"  → {call.function.name}({args})")
-            if call.function.name not in tool_map:
-                result = f"Error: unknown tool '{call.function.name}'"
-            else:
-                result = tool_map[call.function.name](args)
             print(f"    {result[:200]}")
-            messages.append({
-                "role": "tool",
-                "tool_call_id": call.id,
-                "content": result
-            })
-
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
     print("Agent: reached max steps.")
 
 def run_agent_anthropic(task):
     import anthropic
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
     anthropic_tools = [
-        {
-            "name": t["function"]["name"],
-            "description": t["function"]["description"],
-            "input_schema": t["function"]["parameters"]
-        }
+        {"name": t["function"]["name"], "description": t["function"]["description"],
+         "input_schema": t["function"]["parameters"]}
         for t in tools_schema
     ]
-
     messages = [{"role": "user", "content": task}]
     system = "You are a coding agent. Complete tasks by using tools. When done, summarize what you did."
-
-    for step in range(10):
+    for _ in range(10):
         response = client.messages.create(
-            model=model, max_tokens=4096,
-            system=system,
-            tools=anthropic_tools,
-            messages=messages
+            model=model, max_tokens=4096, system=system,
+            tools=anthropic_tools, messages=messages
         )
-
         tool_results = []
         for block in response.content:
             if block.type == "tool_use":
                 print(f"  → {block.name}({block.input})")
-                if block.name not in tool_map:
-                    result = f"Error: unknown tool '{block.name}'"
-                else:
-                    result = tool_map[block.name](block.input)
+                try:
+                    if block.name not in tool_map:
+                        result = f"Error: unknown tool '{block.name}'"
+                    else:
+                        result = tool_map[block.name](block.input)
+                except Exception as e:
+                    result = f"Error: {e}" 
                 print(f"    {result[:200]}")
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result
-                })
+                tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
             elif block.type == "text" and block.text:
                 if response.stop_reason != "tool_use":
                     print(f"\nAgent: {block.text}")
-
         if response.stop_reason == "end_turn" or not tool_results:
             return
-
         messages += [
             {"role": "assistant", "content": response.content},
             {"role": "user", "content": tool_results}
         ]
-
     print("Agent: reached max steps.")
-
-# --- Main ---
 
 print(f"llmkit agent | {provider} / {model}")
 print(f"Workspace: {WORKSPACE}")

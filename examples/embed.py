@@ -38,7 +38,10 @@ def embed_local(texts):
                 "model": config["model"],
                 "input": text
             }, timeout=60)
-            embeddings.append(res.json()["embeddings"][0])
+            data = res.json()
+            if "error" in data:
+                raise RuntimeError(f"Ollama error: {data['error']}")
+            embeddings.append(data["embeddings"][0])
         except requests.exceptions.ConnectionError:
             raise RuntimeError("Ollama is not running. Start it with: ollama serve")
     return embeddings

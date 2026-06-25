@@ -32,6 +32,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 console.log(`llmkit | ${config.provider} / ${config.model} | streaming`);
 
 rl.question("You: ", async (prompt) => {
+    if (!prompt.trim()) { rl.close(); return; }
     process.stdout.write("AI: ");
     try {
 
@@ -43,13 +44,19 @@ rl.question("You: ", async (prompt) => {
         });
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const lines = decoder.decode(value).split("\n").filter(Boolean);
+            buffer += decoder.decode(value);
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
             for (const line of lines) {
-                const data = JSON.parse(line);
-                if (data.response) process.stdout.write(data.response);
+                if (!line.trim()) continue;
+                try {
+                    const data = JSON.parse(line);
+                    if (data.response) process.stdout.write(data.response);
+                } catch {}
             }
         }
     } else {
@@ -67,16 +74,20 @@ rl.question("You: ", async (prompt) => {
         });
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const lines = decoder.decode(value)
-                .split("\n")
-                .filter(l => l.startsWith("data: ") && l !== "data: [DONE]");
+            buffer += decoder.decode(value);
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
             for (const line of lines) {
-                const data = JSON.parse(line.slice(6));
-                const content = data.choices?.[0]?.delta?.content;
-                if (content) process.stdout.write(content);
+                if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+                try {
+                    const data = JSON.parse(line.slice(6));
+                    const content = data.choices?.[0]?.delta?.content;
+                    if (content) process.stdout.write(content);
+                } catch {}
             }
         }
     }

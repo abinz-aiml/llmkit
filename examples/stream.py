@@ -21,6 +21,9 @@ model = config["model"]
 
 print(f"llmkit | {provider} / {model} | streaming")
 prompt = input("You: ").strip()
+if not prompt:
+    sys.exit(0)
+
 print("AI: ", end="", flush=True)
 
 if provider == "local":

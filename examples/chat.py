@@ -58,4 +58,4 @@ while True:
         print("\nBye!")
         break
     except Exception as e:
-        print(f"Error: {e}\n")
+        print(f"Error: {e}")

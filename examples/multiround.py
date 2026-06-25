@@ -56,10 +56,8 @@ while True:
         if not user_input:
             continue
         messages.append({"role": "user", "content": user_input})
-        if len(messages) > MAX_TURNS:
-            messages = messages[-MAX_TURNS:]
-            if messages[0]["role"] != "user":
-                messages = messages[1:]
+        if len(messages) > MAX_TURNS * 2:
+            messages = messages[-(MAX_TURNS * 2):]
         reply = chat(messages)
         messages.append({"role": "assistant", "content": reply})
         print(f"AI: {reply}\n")
@@ -67,4 +65,6 @@ while True:
         print("\nBye!")
         break
     except Exception as e:
-        print(f"Error: {e}\n")
+        if messages and messages[-1]["role"] == "user":
+            messages.pop()
+        print(f"Error: {e}")

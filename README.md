@@ -62,6 +62,34 @@ node examples/chat.js
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |
 | Mistral | `MISTRAL_API_KEY` | `mistral-small-latest` |
 
+## MCP Agent (connect any tool)
+
+`mcp_agent.py` connects to any [MCP server](https://github.com/modelcontextprotocol/servers) and lets the LLM use its tools automatically — no code changes needed.
+
+**1. Add `mcp_servers` to `llm.yaml`:**
+
+```yaml
+provider: anthropic
+model: claude-3-5-haiku-20241022
+mcp_servers:
+  - name: filesystem
+    command: npx -y @modelcontextprotocol/server-filesystem ./
+  - name: github
+    command: npx -y @modelcontextprotocol/server-github
+    env:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+```
+
+**2. Run:**
+
+```bash
+python examples/mcp_agent.py
+```
+
+The agent connects to each server, discovers its tools, and uses them to complete your task. Works with any MCP-compatible server — filesystem, GitHub, Slack, Postgres, browser, and more.
+
+> Requires Node.js for `npx`-based servers. Install the `mcp` Python package via `pip install mcp`.
+
 ## Optional UI (Docker)
 
 ```bash

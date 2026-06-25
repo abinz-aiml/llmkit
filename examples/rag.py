@@ -68,4 +68,5 @@ if provider not in providers_map:
     sys.exit(1)
 
 send_message = importlib.import_module(providers_map[provider]).send_message
-print(f"\nAI: {send_message(prompt, model)}")
+answer = send_message(prompt, model)
+print(f"\nAnswer: {answer}")

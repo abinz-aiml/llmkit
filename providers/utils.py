@@ -17,7 +17,11 @@ API_KEY_NAMES = {
 
 def openai_client(provider):
     from openai import OpenAI
-    key = os.getenv(API_KEY_NAMES.get(provider, ""))
+    env_var = API_KEY_NAMES.get(provider, "")
+    key = os.getenv(env_var) if env_var else None
+    if not key:
+        hint = env_var if env_var else "unknown provider"
+        raise RuntimeError(f"API key not set for '{provider}'. Add {hint} to your .env file.")
     kwargs = {"api_key": key}
     if provider in BASE_URLS:
         kwargs["base_url"] = BASE_URLS[provider]

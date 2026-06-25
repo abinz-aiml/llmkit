@@ -37,47 +37,30 @@ def calculate(expression):
 tool_map = {"get_weather": get_weather, "calculate": calculate}
 
 tools_schema = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_weather",
-            "description": "Get current weather for a city",
-            "parameters": {
-                "type": "object",
-                "properties": {"city": {"type": "string"}},
-                "required": ["city"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "calculate",
-            "description": "Evaluate a math expression like 2+2 or 10*5",
-            "parameters": {
-                "type": "object",
-                "properties": {"expression": {"type": "string"}},
-                "required": ["expression"]
-            }
-        }
-    }
+    {"type": "function", "function": {
+        "name": "get_weather", "description": "Get current weather for a city",
+        "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}
+    }},
+    {"type": "function", "function": {
+        "name": "calculate", "description": "Evaluate a math expression like 2+2 or 10*5",
+        "parameters": {"type": "object", "properties": {"expression": {"type": "string"}}, "required": ["expression"]}
+    }},
 ]
 
 prompt = input("You: ").strip()
+if not prompt:
+    sys.exit(0)
 
 if provider == "anthropic":
     import anthropic
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     anthropic_tools = [
-        {"name": t["function"]["name"], "description": t["function"]["description"], "input_schema": t["function"]["parameters"]}
+        {"name": t["function"]["name"], "description": t["function"]["description"],
+         "input_schema": t["function"]["parameters"]}
         for t in tools_schema
     ]
     messages = [{"role": "user", "content": prompt}]
-    response = client.messages.create(
-        model=model, max_tokens=1024,
-        tools=anthropic_tools,
-        messages=messages
-    )
+    response = client.messages.create(model=model, max_tokens=1024, tools=anthropic_tools, messages=messages)
 
     tool_results = []
     for block in response.content:
@@ -85,13 +68,12 @@ if provider == "anthropic":
             if block.name not in tool_map:
                 print(f"Unknown tool: {block.name}")
                 continue
-            result = tool_map[block.name](**block.input)
+            try:
+                result = tool_map[block.name](**block.input)
+            except Exception as e:
+                result = f"Error: {e}"
             print(f"Tool: {block.name}({block.input}) → {result}")
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": block.id,
-                "content": result
-            })
+            tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
         elif block.type == "text" and block.text:
             print(f"AI: {block.text}")
 
@@ -116,7 +98,11 @@ else:
     if message.tool_calls:
         tool_results = []
         for call in message.tool_calls:
-            args = json.loads(call.function.arguments)
+            try:
+                args = json.loads(call.function.arguments)
+            except Exception as e:
+                print(f"Error parsing arguments for {call.function.name}: {e}")
+                continue
             if call.function.name not in tool_map:
                 print(f"Unknown tool: {call.function.name}")
                 continue

@@ -30,6 +30,7 @@ async function sendMessage(prompt) {
             body: JSON.stringify({ model: config.model, prompt, stream: false }),
         });
         const data = await res.json();
+        if (data.error) throw new Error(`Ollama error: ${data.error}`);
         return data.response;
     }
 
@@ -46,6 +47,7 @@ async function sendMessage(prompt) {
     });
 
     const data = await res.json();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
     return data.choices[0].message.content;
 }
 
@@ -60,16 +62,17 @@ console.log(`llmkit | ${config.provider} / ${config.model}`);
 console.log("Ctrl+C to exit\n");
 
 function ask() {
-    rl.question("You: ", async (input) => {
-        if (!input.trim()) return ask();
+    rl.question("You: ", async (prompt) => {
+        if (!prompt.trim()) { ask(); return; }
         try {
-            const response = await sendMessage(input.trim());
-            console.log(`AI: ${response}\n`);
+            const reply = await sendMessage(prompt.trim());
+            console.log(`AI: ${reply}\n`);
         } catch (err) {
-            console.error(`Error: ${err.message}\n`);
+            console.error(`Error: ${err.message}`);
         }
         ask();
     });
 }
 
+rl.on("close", () => { console.log("\nBye!"); process.exit(0); });
 ask();
