@@ -33,7 +33,7 @@ def load_provider():
 
 send_message, model, provider = load_provider()
 
-print(f"llmctl | {provider} / {model}")
+print(f"llmkit | {provider} / {model}")
 print("Ctrl+C to exit\n")
 
 while True:
